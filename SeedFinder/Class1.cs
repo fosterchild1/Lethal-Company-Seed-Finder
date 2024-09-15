@@ -21,11 +21,7 @@ namespace SeedFinder
         private readonly Harmony harmony = new Harmony(modGUID);
         public static SeedFinderBase Instance;
         internal ManualLogSource logger;
-        public class EnemySpawn
-        {
-            public string EnemyType { get; set; }
-            public int amount { get; set; }
-        }
+
         public class LevelScrap
         {
             public int rarity { get; set; }
