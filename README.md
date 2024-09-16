@@ -1,2 +1,5 @@
 # SeedFinder
-Finds lethal company seeds on experimentation that have a single scrap day. Must be installed as a mod using bepinex. Logs results in console.
+Finds cool lethal company seeds
+
+# Usage
+Install the mod and enable the bepinex console. then go to any planet you want and the seeds for that planet will be printed in the console
