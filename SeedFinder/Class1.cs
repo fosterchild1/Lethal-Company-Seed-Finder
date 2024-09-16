@@ -138,7 +138,7 @@ namespace SeedFinder.Patches
                     var outsideobject = currentLevel.spawnableOutsideObjects[j];
                     int width = outsideobject.spawnableObject.objectWidth;
                     double num3 = random.NextDouble();
-                    int num = (int)outsideobject.randomAmount.Evaluate((float)num3);
+                    int num = (int)currentLevel.spawnableOutsideObjects[j].randomAmount.Evaluate((float)num3);
                     if (-1 == j)
                     {
                         num += 12;
@@ -152,7 +152,7 @@ namespace SeedFinder.Patches
                     {
                         int num4 = random.Next(0, outsideAINodes.Length);
                         Vector3 vector = GetRandomNavMeshPositionInBoxPredictable(outsideAINodes[num4].transform.position, 30f, navMeshHit, random, -1);
-                        if (outsideobject.spawnableObject.spawnableFloorTags == null)
+                        if (currentLevel.spawnableOutsideObjects[j].spawnableObject.spawnableFloorTags == null)
                         {
                             goto IL_251;
                         }
@@ -160,9 +160,9 @@ namespace SeedFinder.Patches
                         RaycastHit raycastHit;
                         if (Physics.Raycast(vector + Vector3.up, Vector3.down, out raycastHit, 5f, StartOfRound.Instance.collidersAndRoomMaskAndDefault))
                         {
-                            for (int l = 0; l < outsideobject.spawnableObject.spawnableFloorTags.Length; l++)
+                            for (int l = 0; l < currentLevel.spawnableOutsideObjects[j].spawnableObject.spawnableFloorTags.Length; l++)
                             {
-                                if (raycastHit.collider.transform.CompareTag(outsideobject.spawnableObject.spawnableFloorTags[l]))
+                                if (raycastHit.collider.transform.CompareTag(currentLevel.spawnableOutsideObjects[j].spawnableObject.spawnableFloorTags[l]))
                                 {
                                     flag = true;
                                     break;
@@ -177,7 +177,7 @@ namespace SeedFinder.Patches
                         k++;
                         continue;
                     IL_251:
-                        vector = PositionEdgeCheck(vector, (float)width, navHit);
+                        vector = PositionEdgeCheck(vector, (float)currentLevel.spawnableOutsideObjects[j].spawnableObject.objectWidth, navHit);
                         if (vector == Vector3.zero)
                         {
                             goto IL_57F;
@@ -185,7 +185,7 @@ namespace SeedFinder.Patches
                         bool flag2 = false;
                         for (int m = 0; m < shipSpawnPathPoints.Length; m++)
                         {
-                            if (Vector3.Distance(shipSpawnPathPoints[m].transform.position, vector) < (float)width + 6f)
+                            if (Vector3.Distance(shipSpawnPathPoints[m].transform.position, vector) < (float)currentLevel.spawnableOutsideObjects[j].spawnableObject.objectWidth + 6f)
                             {
                                 flag2 = true;
                                 break;
@@ -197,7 +197,7 @@ namespace SeedFinder.Patches
                         }
                         for (int n = 0; n < spawnDenialPoints.Length; n++)
                         {
-                            if (Vector3.Distance(spawnDenialPoints[n].transform.position, vector) < (float)width + 6f)
+                            if (Vector3.Distance(spawnDenialPoints[n].transform.position, vector) < (float)currentLevel.spawnableOutsideObjects[j].spawnableObject.objectWidth + 6f)
                             {
                                 flag2 = true;
                                 break;
@@ -207,7 +207,7 @@ namespace SeedFinder.Patches
                         {
                             goto IL_57F;
                         }
-                        if (Vector3.Distance(GameObject.FindGameObjectWithTag("ItemShipLandingNode").transform.position, vector) < (float)width + 4f)
+                        if (Vector3.Distance(GameObject.FindGameObjectWithTag("ItemShipLandingNode").transform.position, vector) < (float)currentLevel.spawnableOutsideObjects[j].spawnableObject.objectWidth + 4f)
                         {
                             break;
                         }
@@ -218,7 +218,7 @@ namespace SeedFinder.Patches
                                 flag2 = false;
                                 for (int num5 = 0; num5 < list.Count; num5++)
                                 {
-                                    if (Vector3.Distance(vector, list[num5]) < (float)width)
+                                    if (Vector3.Distance(vector, list[num5]) < (float)currentLevel.spawnableOutsideObjects[j].spawnableObject.objectWidth)
                                     {
                                         flag2 = true;
                                         break;
@@ -231,14 +231,18 @@ namespace SeedFinder.Patches
                             }
                             list.Add(vector);
 
-                            string objname = outsideobject.spawnableObject.name;
+                            string objname = currentLevel.spawnableOutsideObjects[j].spawnableObject.prefabToSpawn.name;
                             if (!objectlist.ContainsKey(objname))
                             {
                                 objectlist.Add(objname, 1);
                             }
                             objectlist[objname]++;
                             num2++;
-                            goto IL_57F;
+
+                            if (!currentLevel.spawnableOutsideObjects[j].spawnableObject.spawnFacingAwayFromWall)
+                            {
+                                random.Next(0, 360);
+                            }
                         }
                         goto IL_57F;
                     }
@@ -247,7 +251,7 @@ namespace SeedFinder.Patches
             return objectlist;
         }
 
-        [HarmonyPatch("SpawnScrapInLevel")]
+        [HarmonyPatch("SetToCurrentLevelWeather")]
         [HarmonyPostfix]
         static void Patch(ref SelectableLevel ___currentLevel, ref NavMeshHit ___navHit, ref Transform[] ___shipSpawnPathPoints)
         {
@@ -266,26 +270,25 @@ namespace SeedFinder.Patches
                 logger.LogInfo(kvp.Key);
                 logger.LogInfo(kvp.Value);
             }
+
+            logger.LogInfo(string.Format("SEEDS: {0} {1}", RoundManager.Instance.playersManager.randomMapSeed, StartOfRound.Instance.randomMapSeed));
+
             int highestPumpkinAmount = 0;
             void checkSeed(int seed)
             {
 
                 //  logger.LogInfo(seed.ToString());
-                SpawnableItemWithRarity item = CheckSSD(seed, level);
+               // SpawnableItemWithRarity item = CheckSSD(seed, level);
                 Dictionary<string, int> outsideObjects = getOutsideObjects(seed, level, navHit, shipSpawnPathPoints);
-                if (item != null && item.spawnableItem.itemName == "Gold bar")
+                int pumpkins;
+                if (outsideObjects.TryGetValue("GiantPumpkin", out pumpkins) && pumpkins >= highestPumpkinAmount)
                 {
-                    logger.LogInfo(seed);
-                    int pumpkins;
-                    if (outsideObjects.TryGetValue("GiantPumpkin", out pumpkins) && pumpkins >= highestPumpkinAmount)
-                    {
-                        logger.LogInfo(string.Format("HIGH PUMPKIN AMOUNT ({0}): {1}", pumpkins, seed));
-                        highestPumpkinAmount = pumpkins;
-                    }
+                    logger.LogInfo(string.Format("HIGH PUMPKIN AMOUNT ({0}): {1}", pumpkins, seed));
+                    highestPumpkinAmount = pumpkins;
                 }
             }
            
-            for (int seed = 0; seed < 10000; seed++)
+            for (int seed = 0; seed < 1000000; seed++)
             {
                 checkSeed(seed);
             }
