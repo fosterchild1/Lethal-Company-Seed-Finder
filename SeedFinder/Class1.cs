@@ -23,7 +23,7 @@ namespace SeedFinder
     [BepInPlugin(modGUID, "Seedfinder", "1.0.0")]
     public class SeedFinderBase : BaseUnityPlugin
     {
-        private const string modGUID = "seedfinder.ye";
+        public const string modGUID = "seedfinder.ye";
         private readonly Harmony harmony = new Harmony(modGUID);
         public static SeedFinderBase Instance;
         internal ManualLogSource logger;
@@ -40,6 +40,11 @@ namespace SeedFinder
             harmony.PatchAll(typeof(SeedFinderBase));
             harmony.PatchAll(typeof(SeedFinderPatches));
             logger.LogInfo("finder awake");
+        }
+        void Update()
+        {
+            logger.LogInfo("hi");
+            logger.LogInfo(RoundManager.Instance.minOutsideEnemiesToSpawn);
         }
     }
 }
@@ -139,10 +144,6 @@ namespace SeedFinder.Patches
                     int width = outsideobject.spawnableObject.objectWidth;
                     double num3 = random.NextDouble();
                     int num = (int)currentLevel.spawnableOutsideObjects[j].randomAmount.Evaluate((float)num3);
-                    if (-1 == j)
-                    {
-                        num += 12;
-                    }
                     if ((float)random.Next(0, 100) < 20f)
                     {
                         num *= 2;
@@ -251,44 +252,163 @@ namespace SeedFinder.Patches
             return objectlist;
         }
 
-        [HarmonyPatch("SetToCurrentLevelWeather")]
+        private static void ResetEnemyTypesSpawnedCounts(SelectableLevel currentLevel)
+        {
+            for (int k = 0; k < currentLevel.OutsideEnemies.Count; k++)
+            {
+                currentLevel.OutsideEnemies[k].enemyType.numberSpawned = 0;
+            }
+        }
+
+
+        private static Dictionary<string, int> predictAllOutsideEnemies(int seed, SelectableLevel currentLevel, int minOutsideEnemiesToSpawn, int currentMaxOutsidePower, TimeOfDay timeScript)
+        {
+            ResetEnemyTypesSpawnedCounts(currentLevel);
+            int GetRandomWeightedIndex(int[] weights, System.Random anomalyRandom)
+            {
+                if (weights == null || weights.Length == 0)
+                {
+                    Debug.Log("Could not get random weighted index; array is empty or null.");
+                    return -1;
+                }
+                int number = 0;
+                for (int i_ = 0; i_ < weights.Length; i_++)
+                {
+                    if (weights[i_] >= 0)
+                    {
+                        number += weights[i_];
+                    }
+                }
+                if (number <= 0)
+                {
+                    return anomalyRandom.Next(0, weights.Length);
+                }
+                float number2 = (float)anomalyRandom.NextDouble();
+                float number3 = 0f;
+                for (int i_2 = 0; i_2 < weights.Length; i_2++)
+                {
+                    if ((float)weights[i_2] > 0f)
+                    {
+                        number3 += (float)weights[i_2] / (float)number;
+                        if (number3 >= number2)
+                        {
+                            return i_2;
+                        }
+                    }
+                }
+                return anomalyRandom.Next(0, weights.Length);
+            }
+
+            int i = 0;
+            float num = 0f;
+            bool flag = true;
+            System.Random random = new System.Random(seed + 41);
+            new System.Random(seed + 21);
+
+            List<int> SpawnProbabilities = new List<int>();
+            Dictionary<string, int> enemies = new Dictionary<string, int>();
+
+            while (i < TimeOfDay.Instance.numberOfHours)
+            {
+                i += 2;
+                float num2 = 100f * (float)i;
+                float num3 = currentLevel.outsideEnemySpawnChanceThroughDay.Evaluate(num2 / timeScript.totalTime);
+                float num4 = num3 + (float)Mathf.Abs(TimeOfDay.Instance.daysUntilDeadline - 3) / 1.6f;
+                int num5 = Mathf.Clamp(random.Next((int)(num4 - 3f), (int)(num3 + 3f)), minOutsideEnemiesToSpawn, 20);
+                for (int j = 0; j < num5; j++)
+                {
+                    SpawnProbabilities.Clear();
+                    int num6 = 0;
+                    for (int k = 0; k < currentLevel.OutsideEnemies.Count; k++)
+                    {
+                        EnemyType enemyType = currentLevel.OutsideEnemies[k].enemyType;
+                        if (flag)
+                        {
+                            enemyType.numberSpawned = 0;
+                        }
+                        if (enemyType.PowerLevel > currentMaxOutsidePower - num || enemyType.numberSpawned >= enemyType.MaxCount || enemyType.spawningDisabled)
+                        {
+                            SpawnProbabilities.Add(0);
+                        }
+                        else
+                        {
+                            int num7;
+                            if (enemyType.useNumberSpawnedFalloff)
+                            {
+                                num7 = (int)((float)currentLevel.OutsideEnemies[k].rarity * (enemyType.probabilityCurve.Evaluate(num2 / timeScript.totalTime) * enemyType.numberSpawnedFalloff.Evaluate((float)enemyType.numberSpawned / 10f)));
+                            }
+                            else
+                            {
+                                num7 = (int)((float)currentLevel.OutsideEnemies[k].rarity * enemyType.probabilityCurve.Evaluate(num2 / timeScript.totalTime));
+                            }
+                            SpawnProbabilities.Add(num7);
+                            num6 += num7;
+                        }
+                    }
+                    flag = false;
+                    if (num6 > 0)
+                    {
+                        int randomWeightedIndex = GetRandomWeightedIndex(SpawnProbabilities.ToArray(), random);
+                        EnemyType enemyType2 = currentLevel.OutsideEnemies[randomWeightedIndex].enemyType;
+
+                        string enemyname = enemyType2.enemyName;
+                        if (!enemies.ContainsKey(enemyname))
+                        {
+                            enemies.Add(enemyname, 0);
+                        }
+                        enemies[enemyname]++;
+                        num += enemyType2.PowerLevel;
+                        enemyType2.numberSpawned++;
+                    }
+                }
+            }
+            return enemies;
+        }
+
+        [HarmonyPatch("PredictAllOutsideEnemies")]
         [HarmonyPostfix]
-        static void Patch(ref SelectableLevel ___currentLevel, ref NavMeshHit ___navHit, ref Transform[] ___shipSpawnPathPoints)
+        static void Patch(ref SelectableLevel ___currentLevel, ref NavMeshHit ___navHit, ref Transform[] ___shipSpawnPathPoints, 
+            ref int ___minOutsideEnemiesToSpawn, ref TimeOfDay ___timeScript)
         {
             SelectableLevel level = ___currentLevel;
             NavMeshHit navHit = ___navHit;
             Transform[] shipSpawnPathPoints = ___shipSpawnPathPoints;
+            int minOutsideEnemiesToSpawn = ___minOutsideEnemiesToSpawn;
+            int currentMaxOutsidePower = level.maxOutsideEnemyPowerCount;
+            TimeOfDay timeScript = ___timeScript;
 
 
             /*  foreach (var thing in level.spawnableScrap)
               {
                   logger.LogInfo(thing.spawnableItem.itemName);
               }*/
-            Dictionary<string, int> outsideobjects = getOutsideObjects(StartOfRound.Instance.randomMapSeed, level, ___navHit, ___shipSpawnPathPoints);
+            Dictionary<string, int> outsideobjects = predictAllOutsideEnemies(1, level, minOutsideEnemiesToSpawn, currentMaxOutsidePower, timeScript);
             foreach (KeyValuePair<string, int> kvp in outsideobjects)
             {
                 logger.LogInfo(kvp.Key);
                 logger.LogInfo(kvp.Value);
             }
+            logger.LogInfo(TimeOfDay.Instance.daysUntilDeadline);
 
             logger.LogInfo(string.Format("SEEDS: {0} {1}", RoundManager.Instance.playersManager.randomMapSeed, StartOfRound.Instance.randomMapSeed));
 
-            int highestPumpkinAmount = 0;
+            int lowest = 3000;
             void checkSeed(int seed)
             {
 
                 //  logger.LogInfo(seed.ToString());
                // SpawnableItemWithRarity item = CheckSSD(seed, level);
-                Dictionary<string, int> outsideObjects = getOutsideObjects(seed, level, navHit, shipSpawnPathPoints);
-                int pumpkins;
-                if (outsideObjects.TryGetValue("GiantPumpkin", out pumpkins) && pumpkins >= highestPumpkinAmount)
+                //Dictionary<string, int> outsideObjects = getOutsideObjects(seed, level, navHit, shipSpawnPathPoints);
+                Dictionary<string, int> predictedEnemies = predictAllOutsideEnemies(seed, level, minOutsideEnemiesToSpawn, currentMaxOutsidePower, timeScript);
+                int mechs;
+                if (predictedEnemies.TryGetValue("RadMech", out mechs) && mechs <= lowest)
                 {
-                    logger.LogInfo(string.Format("HIGH PUMPKIN AMOUNT ({0}): {1}", pumpkins, seed));
-                    highestPumpkinAmount = pumpkins;
+                    logger.LogInfo(string.Format("LOW MECH AMOUNT ({0}): {1}", mechs, seed));
+                    lowest = mechs;
                 }
             }
            
-            for (int seed = 0; seed < 1000000; seed++)
+            for (int seed = 0; seed < 1; seed++)
             {
                 checkSeed(seed);
             }
