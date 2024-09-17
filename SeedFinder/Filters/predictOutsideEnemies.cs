@@ -135,8 +135,14 @@ namespace SeedFinder.predictOutsideEnemies
 
                         float spawnAmount = (float)Mathf.Max(enemyType2.spawnInGroupsOf, 1);
                         int spawned = 0;
-                        while ((float)spawned < spawnAmount && enemyType2.PowerLevel <= currentMaxOutsidePower - currentOutsideEnemyPower)
-                        {
+                        bool result = false;
+                        for (int k = 0; (float)k < spawnAmount; k++)
+                         {
+                            if (enemyType2.PowerLevel > currentMaxOutsidePower - currentOutsideEnemyPower)
+                            {
+                                break;
+                            }
+
                             string enemyname = enemyType2.enemyName;
                             if (!enemies.ContainsKey(enemyname))
                             {
@@ -147,7 +153,15 @@ namespace SeedFinder.predictOutsideEnemies
                             currentOutsideEnemyPower += enemyType2.PowerLevel;
                             enemyType2.numberSpawned++;
                             spawned++;
+                            result = true;
                         }
+                        if (!result)
+                        {
+                            break;
+                        }
+                    } else
+                    {
+                        break;
                     }
                 }
             }
