@@ -73,11 +73,9 @@ namespace SeedFinder.predictOutsideEnemies
         }
 
 
-        public static Dictionary<string, int> predictAllOutsideEnemies(int seed, SelectableLevel currentLevel, int minOutsideEnemiesToSpawn, float currentMaxOutsidePower, TimeOfDay timeScript,
-            int hourTimeBetweenEnemySpawnBatches)
+        public static Dictionary<string, int> predictAllOutsideEnemies(int seed, SelectableLevel currentLevel, int minOutsideEnemiesToSpawn, float currentMaxOutsidePower, TimeOfDay timeScript)
         {
             ResetEnemyTypesSpawnedCounts(currentLevel);
-            int currentHour = 0;
             float currentOutsideEnemyPower = 0f;
             bool flag = true;
             System.Random OutsideEnemyRandom = new System.Random(seed + 41);
@@ -85,9 +83,9 @@ namespace SeedFinder.predictOutsideEnemies
             List<int> SpawnProbabilities = new List<int>();
             Dictionary<string, int> enemies = new Dictionary<string, int>();
 
-            while (currentHour < TimeOfDay.Instance.numberOfHours)
+            // 2>4>6>8>10>12>14>16>18 end
+            for (int currentHour = 2; currentHour < 19; currentHour += 2)
             {
-                currentHour += hourTimeBetweenEnemySpawnBatches;
                 if (currentOutsideEnemyPower > currentMaxOutsidePower)
                 {
                     break;
@@ -128,38 +126,34 @@ namespace SeedFinder.predictOutsideEnemies
                         }
                     }
                     flag = false;
-                    if (num5 > 0)
+                    if (num5 <= 0)
                     {
-                        int randomWeightedIndex = GetRandomWeightedIndex(SpawnProbabilities.ToArray(), OutsideEnemyRandom);
-                        EnemyType enemyType2 = currentLevel.OutsideEnemies[randomWeightedIndex].enemyType;
+                        break;
+                    }
+                    int randomWeightedIndex = GetRandomWeightedIndex(SpawnProbabilities.ToArray(), OutsideEnemyRandom);
+                    EnemyType enemyType2 = currentLevel.OutsideEnemies[randomWeightedIndex].enemyType;
 
-                        float spawnAmount = (float)Mathf.Max(enemyType2.spawnInGroupsOf, 1);
-                        int spawned = 0;
-                        bool result = false;
-                        for (int k = 0; (float)k < spawnAmount; k++)
-                         {
-                            if (enemyType2.PowerLevel > currentMaxOutsidePower - currentOutsideEnemyPower)
-                            {
-                                break;
-                            }
-
-                            string enemyname = enemyType2.enemyName;
-                            if (!enemies.ContainsKey(enemyname))
-                            {
-                                enemies.Add(enemyname, 0);
-                            }
-                            enemies[enemyname]++;
-
-                            currentOutsideEnemyPower += enemyType2.PowerLevel;
-                            enemyType2.numberSpawned++;
-                            spawned++;
-                            result = true;
-                        }
-                        if (!result)
+                    float spawnAmount = (float)Mathf.Max(enemyType2.spawnInGroupsOf, 1);
+                    bool result = false;
+                    for (int k = 0; (float)k < spawnAmount; k++)
+                    {
+                        if (enemyType2.PowerLevel > currentMaxOutsidePower - currentOutsideEnemyPower)
                         {
                             break;
                         }
-                    } else
+
+                        string enemyname = enemyType2.enemyName;
+                        if (!enemies.ContainsKey(enemyname))
+                        {
+                            enemies.Add(enemyname, 0);
+                        }
+                        enemies[enemyname]++;
+
+                        currentOutsideEnemyPower += enemyType2.PowerLevel;
+                        enemyType2.numberSpawned++;
+                        result = true;
+                    }
+                    if (!result)
                     {
                         break;
                     }

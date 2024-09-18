@@ -84,11 +84,17 @@ namespace SeedFinder.Patches
             return null;
         }
 
+        [HarmonyPatch("AdvanceHourAndSpawnNewBatchOfEnemies")]
+        [HarmonyPostfix]
+        static void Patch2(ref int ___currentHour)
+        {
+            logger.LogInfo(string.Format("ADVANCED HOUR, CURRENT HOUR: {0}", ___currentHour));
+        }
+
         [HarmonyPatch("PredictAllOutsideEnemies")]
         [HarmonyPrefix]
         static void Patch(ref SelectableLevel ___currentLevel, ref NavMeshHit ___navHit, ref Transform[] ___shipSpawnPathPoints, 
-            ref int ___minOutsideEnemiesToSpawn, ref TimeOfDay ___timeScript, ref int ___hourTimeBetweenEnemySpawnBatches,
-            ref EnemyAI[] ___SpawnedEnemies)
+            ref int ___minOutsideEnemiesToSpawn, ref TimeOfDay ___timeScript)
         {
             SelectableLevel level = ___currentLevel;
             NavMeshHit navHit = ___navHit;
@@ -96,13 +102,6 @@ namespace SeedFinder.Patches
             int minOutsideEnemiesToSpawn = ___minOutsideEnemiesToSpawn;
             float currentMaxOutsidePower = (float)level.maxOutsideEnemyPowerCount;
             TimeOfDay timeScript = ___timeScript;
-            int hourTimeBetweenEnemySpawnBatches = ___hourTimeBetweenEnemySpawnBatches;
-
-            Dictionary<string, int> predictedEnemies_ = predicter.predictAllOutsideEnemies(1, level, minOutsideEnemiesToSpawn, currentMaxOutsidePower, timeScript, hourTimeBetweenEnemySpawnBatches);
-            foreach (KeyValuePair<string, int>kvp in predictedEnemies_)
-            {
-                logger.LogInfo(string.Format("predicted: {0} AMOUNT: {1}", kvp.Key, kvp.Value));
-            }
 
             int highest = 0;
             void checkSeed(int seed)
@@ -111,7 +110,7 @@ namespace SeedFinder.Patches
                 //  logger.LogInfo(seed.ToString());
                // SpawnableItemWithRarity item = CheckSSD(seed, level);
                 //Dictionary<string, int> objects = outsideObjects.getOutsideObjects(seed, level, navHit, shipSpawnPathPoints);
-                Dictionary<string, int> predictedEnemies = predicter.predictAllOutsideEnemies(seed, level, minOutsideEnemiesToSpawn, currentMaxOutsidePower, timeScript, hourTimeBetweenEnemySpawnBatches);
+                Dictionary<string, int> predictedEnemies = predicter.predictAllOutsideEnemies(seed, level, minOutsideEnemiesToSpawn, currentMaxOutsidePower, timeScript);
                 int mechs;
                 if (predictedEnemies.TryGetValue("RadMech", out mechs) && mechs >= highest)
                 {
