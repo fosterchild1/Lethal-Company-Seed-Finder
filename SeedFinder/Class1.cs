@@ -84,13 +84,6 @@ namespace SeedFinder.Patches
             return null;
         }
 
-        [HarmonyPatch("AdvanceHourAndSpawnNewBatchOfEnemies")]
-        [HarmonyPostfix]
-        static void Patch2(ref int ___currentHour)
-        {
-            logger.LogInfo(string.Format("ADVANCED HOUR, CURRENT HOUR: {0}", ___currentHour));
-        }
-
         [HarmonyPatch("PredictAllOutsideEnemies")]
         [HarmonyPrefix]
         static void Patch(ref SelectableLevel ___currentLevel, ref NavMeshHit ___navHit, ref Transform[] ___shipSpawnPathPoints, 
