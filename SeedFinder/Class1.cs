@@ -96,7 +96,7 @@ namespace SeedFinder.Patches
             float currentMaxOutsidePower = (float)level.maxOutsideEnemyPowerCount;
             TimeOfDay timeScript = ___timeScript;
 
-            int highest = 0;
+            int highest = 99;
             void checkSeed(int seed)
             {
 
@@ -105,14 +105,14 @@ namespace SeedFinder.Patches
                 //Dictionary<string, int> objects = outsideObjects.getOutsideObjects(seed, level, navHit, shipSpawnPathPoints);
                 Dictionary<string, int> predictedEnemies = predicter.predictAllOutsideEnemies(seed, level, minOutsideEnemiesToSpawn, currentMaxOutsidePower, timeScript);
                 int mechs;
-                if (predictedEnemies.TryGetValue("RadMech", out mechs) && mechs >= highest)
+                if (predictedEnemies.TryGetValue("RadMech", out mechs) && mechs <= highest)
                 {
                     logger.LogInfo(string.Format("HIGH MECH AMOUNT ({0}): {1}", mechs, seed));
                     highest = mechs;
                 }
             }
            
-            for (int seed = 0; seed < 10000; seed++)
+            for (int seed = 0; seed < 1000000; seed++)
             {
                 checkSeed(seed);
             }

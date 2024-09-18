@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -75,30 +76,29 @@ namespace SeedFinder.predictOutsideEnemies
 
         public static Dictionary<string, int> predictAllOutsideEnemies(int seed, SelectableLevel currentLevel, int minOutsideEnemiesToSpawn, float currentMaxOutsidePower, TimeOfDay timeScript)
         {
-            ResetEnemyTypesSpawnedCounts(currentLevel);
-            float currentOutsideEnemyPower = 0f;
+           
+            int i = 0;
+            float num = 0f;
             bool flag = true;
-            System.Random OutsideEnemyRandom = new System.Random(seed + 41);
-
+            System.Random random = new System.Random(seed + 41);
             List<int> SpawnProbabilities = new List<int>();
             Dictionary<string, int> enemies = new Dictionary<string, int>();
 
-            // 2>4>6>8>10>12>14>16>18 end
-            for (int currentHour = 2; currentHour < 19; currentHour += 2)
+            while (i < TimeOfDay.Instance.numberOfHours)
             {
-                if (currentOutsideEnemyPower > currentMaxOutsidePower)
+                i += 2;
+                float num2 = timeScript.lengthOfHours * (float)i;
+                float num3 = currentLevel.outsideEnemySpawnChanceThroughDay.Evaluate(num2 / timeScript.totalTime);
+                if (StartOfRound.Instance.isChallengeFile)
                 {
-                    break;
+                    num3 += 1f;
                 }
-
-                float num = 100f * (float)currentHour;
-                float num2 = (float)((int)(currentLevel.outsideEnemySpawnChanceThroughDay.Evaluate(num / timeScript.totalTime) * 100f)) / 100f;
-                float num3 = num2 + (float)Mathf.Abs(TimeOfDay.Instance.daysUntilDeadline - 3) / 1.6f;
-                int num4 = Mathf.Clamp(OutsideEnemyRandom.Next((int)(num3 - 3f), (int)(num2 + 3f)), minOutsideEnemiesToSpawn, 20);
-                for (int j = 0; j < num4; j++)
+                float num4 = num3 + (float)Mathf.Abs(TimeOfDay.Instance.daysUntilDeadline - 3) / 1.6f;
+                int num5 = Mathf.Clamp(random.Next((int)(num4 - 3f), (int)(num3 + 3f)), minOutsideEnemiesToSpawn, 20);
+                for (int j = 0; j < num5; j++)
                 {
                     SpawnProbabilities.Clear();
-                    int num5 = 0;
+                    int num6 = 0;
                     for (int k = 0; k < currentLevel.OutsideEnemies.Count; k++)
                     {
                         EnemyType enemyType = currentLevel.OutsideEnemies[k].enemyType;
@@ -106,41 +106,42 @@ namespace SeedFinder.predictOutsideEnemies
                         {
                             enemyType.numberSpawned = 0;
                         }
-                        if (enemyType.PowerLevel > currentMaxOutsidePower - currentOutsideEnemyPower || enemyType.numberSpawned >= enemyType.MaxCount || enemyType.spawningDisabled)
+                        if (enemyType.PowerLevel > currentMaxOutsidePower - num || enemyType.numberSpawned >= enemyType.MaxCount || enemyType.spawningDisabled)
                         {
                             SpawnProbabilities.Add(0);
                         }
                         else
                         {
-                            int num6;
-                            if (enemyType.useNumberSpawnedFalloff)
+                            int num7;
+                            if (-1 == k)
                             {
-                                num6 = (int)((float)currentLevel.OutsideEnemies[k].rarity * (enemyType.probabilityCurve.Evaluate(num / timeScript.totalTime) * enemyType.numberSpawnedFalloff.Evaluate((float)enemyType.numberSpawned / 10f)));
+                                num7 = 100;
+                            }
+                            else if (enemyType.useNumberSpawnedFalloff)
+                            {
+                                num7 = (int)((float)currentLevel.OutsideEnemies[k].rarity * (enemyType.probabilityCurve.Evaluate(num2 / timeScript.totalTime) * enemyType.numberSpawnedFalloff.Evaluate((float)enemyType.numberSpawned / 10f)));
                             }
                             else
                             {
-                                num6 = (int)((float)currentLevel.OutsideEnemies[k].rarity * enemyType.probabilityCurve.Evaluate(num / timeScript.totalTime));
+                                num7 = (int)((float)currentLevel.OutsideEnemies[k].rarity * enemyType.probabilityCurve.Evaluate(num2 / timeScript.totalTime));
                             }
-                            SpawnProbabilities.Add(num6);
-                            num5 += num6;
+                            SpawnProbabilities.Add(num7);
+                            num6 += num7;
                         }
                     }
                     flag = false;
-                    if (num5 <= 0)
+                    if (num6 <= 0)
                     {
-                        break;
-                    }
-                    int randomWeightedIndex = GetRandomWeightedIndex(SpawnProbabilities.ToArray(), OutsideEnemyRandom);
-                    EnemyType enemyType2 = currentLevel.OutsideEnemies[randomWeightedIndex].enemyType;
-
-                    float spawnAmount = (float)Mathf.Max(enemyType2.spawnInGroupsOf, 1);
-                    bool result = false;
-                    for (int k = 0; (float)k < spawnAmount; k++)
-                    {
-                        if (enemyType2.PowerLevel > currentMaxOutsidePower - currentOutsideEnemyPower)
+                        if (num >= currentMaxOutsidePower)
                         {
-                            break;
                         }
+                    }
+                    else
+                    {
+                        int randomWeightedIndex = GetRandomWeightedIndex(SpawnProbabilities.ToArray(), random);
+                        EnemyType enemyType2 = currentLevel.OutsideEnemies[randomWeightedIndex].enemyType;
+                        num += enemyType2.PowerLevel;
+                        enemyType2.numberSpawned++;
 
                         string enemyname = enemyType2.enemyName;
                         if (!enemies.ContainsKey(enemyname))
@@ -148,14 +149,6 @@ namespace SeedFinder.predictOutsideEnemies
                             enemies.Add(enemyname, 0);
                         }
                         enemies[enemyname]++;
-
-                        currentOutsideEnemyPower += enemyType2.PowerLevel;
-                        enemyType2.numberSpawned++;
-                        result = true;
-                    }
-                    if (!result)
-                    {
-                        break;
                     }
                 }
             }
